@@ -12,6 +12,7 @@
 #include "MotionDetector.h"
 
 // 采集线程：读帧 -> 运动检测 -> (运动时自动录像) -> 发信号给 UI，不阻塞界面
+// v3: 一个线程处理一路视频源，可被 MainWindow 实例化多个形成九宫格
 class VideoThread : public QThread
 {
     Q_OBJECT
@@ -19,8 +20,9 @@ public:
     explicit VideoThread(QObject *parent = nullptr);
     ~VideoThread();
 
-    // source: "0" = 默认摄像头；否则为视频文件路径
-    void setSource(const QString &source);
+    // source: "0" = 默认摄像头；否则为视频文件/RTSP 地址
+    // id: 路号，用于录像文件名区分（cam1_xxx.mp4, cam2_xxx.mp4 ...）
+    void setSource(const QString &source, int id);
     void stop();
 
 signals:
@@ -38,6 +40,7 @@ private:
     void stopRecording();
 
     QString source;
+    int cameraId = 0;                           // v3: 路号，用于录像文件命名
     std::atomic<bool> running{false};
     MotionDetector detector;
 

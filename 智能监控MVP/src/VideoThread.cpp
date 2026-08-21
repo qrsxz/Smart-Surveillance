@@ -12,9 +12,10 @@ VideoThread::~VideoThread()
     wait();
 }
 
-void VideoThread::setSource(const QString &s)
+void VideoThread::setSource(const QString &s, int id)
 {
     source = s;
+    cameraId = id;
 }
 
 void VideoThread::stop()
@@ -22,13 +23,13 @@ void VideoThread::stop()
     running = false;
 }
 
-// v2: 打开录像文件，开始录制
+// v2: 打开录像文件，开始录制（v3: 文件名带路号，避免多路同时录制互相覆盖）
 void VideoThread::startRecording(const cv::Size &frameSize, double fps)
 {
     // 自动创建录像目录（相对运行目录的 recordings/）
     QDir().mkpath(recordDir);
 
-    QString name = recordDir + "/cam_" +
+    QString name = recordDir + QString("/cam%1_").arg(cameraId) +
                    QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".mp4";
 
     // mp4v 是 OpenCV 里兼容性最好的 MP4 编码

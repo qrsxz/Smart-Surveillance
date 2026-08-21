@@ -2,11 +2,22 @@
 #define MAINWINDOW_H
 
 #include <QWidget>
+#include <QVector>
+#include <QString>
 
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QGridLayout;
 class VideoThread;
+
+// v3: 一路视频源对应一个格子（线程 + 画面 + 标题）
+struct CameraCell
+{
+    VideoThread *thread = nullptr;
+    QLabel *videoLabel = nullptr;
+    QLabel *nameLabel = nullptr;
+};
 
 class MainWindow : public QWidget
 {
@@ -16,19 +27,21 @@ public:
     ~MainWindow();
 
 private slots:
-    void onStart();
-    void onStop();
-    void onFrame(const QImage &image);
-    void onMotion(bool detected);
-    void onRecording(bool recording);
+    void onAddCamera();
+    void onStopAll();
 
 private:
-    QLabel *videoLabel;
-    QLabel *statusLabel;
+    void addCell(const QString &source);
+
     QLineEdit *sourceEdit;
-    QPushButton *startBtn;
-    QPushButton *stopBtn;
-    VideoThread *thread;
+    QPushButton *addBtn;
+    QPushButton *stopAllBtn;
+    QLabel *infoLabel;
+    QGridLayout *gridLayout;
+
+    QVector<CameraCell> cells;      // 已添加的视频路
+    int cameraIdCounter = 1;        // 路号递增，用于录像文件命名
+    static const int MAX_CELLS = 9; // 九宫格上限
 };
 
 #endif

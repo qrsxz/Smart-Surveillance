@@ -38,6 +38,7 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
     thread = new VideoThread(this);
     connect(thread, &VideoThread::frameReady, this, &MainWindow::onFrame);
     connect(thread, &VideoThread::motionState, this, &MainWindow::onMotion);
+    connect(thread, &VideoThread::recordingState, this, &MainWindow::onRecording);
     connect(thread, &VideoThread::finishedWithError, this, [this](const QString &m) {
         statusLabel->setText("错误：" + m);
         startBtn->setEnabled(true);
@@ -92,4 +93,12 @@ void MainWindow::onFrame(const QImage &image)
 void MainWindow::onMotion(bool detected)
 {
     statusLabel->setText(detected ? "状态：检测到运动！" : "状态：运行中");
+}
+
+void MainWindow::onRecording(bool recording)
+{
+    if (recording)
+        statusLabel->setText("状态：● 录制中…");
+    else
+        statusLabel->setText("状态：运行中");
 }

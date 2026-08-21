@@ -1,6 +1,8 @@
 #include "VideoThread.h"
 
 #include <opencv2/opencv.hpp>
+#include <QDir>
+#include <QDateTime>
 
 VideoThread::VideoThread(QObject *parent) : QThread(parent) {}
 
@@ -18,6 +20,36 @@ void VideoThread::setSource(const QString &s)
 void VideoThread::stop()
 {
     running = false;
+}
+
+// v2: 打开录像文件，开始录制
+void VideoThread::startRecording(const cv::Size &frameSize, double fps)
+{
+    // 自动创建录像目录（相对运行目录的 recordings/）
+    QDir().mkpath(recordDir);
+
+    QString name = recordDir + "/cam_" +
+                   QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".mp4";
+
+    // mp4v 是 OpenCV 里兼容性最好的 MP4 编码
+    writer.open(name.toStdString(),
+                cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
+                fps, frameSize);
+
+    recording = writer.isOpened();
+    if (recording)
+        emit recordingState(true);
+}
+
+// v2: 关闭录像文件（必须 release，否则文件损坏）
+void VideoThread::stopRecording()
+{
+    if (recording)
+    {
+        writer.release();
+        recording = false;
+        emit recordingState(false);
+    }
 }
 
 // cv::Mat -> QImage（注意 BGR->RGB + 深拷贝）
@@ -94,10 +126,27 @@ void VideoThread::run()
             emit motionState(stableMotion);
         }
 
+        // ===== v2: 运动自动录像 =====
+        auto now = std::chrono::steady_clock::now();
+        if (motion)
+            lastMotionTime = now;
+
+        if (motion && !recording)
+            startRecording(frame.size(), (fps > 1.0) ? fps : 30.0);
+
+        if (recording && !motion &&
+            std::chrono::duration_cast<std::chrono::seconds>(now - lastMotionTime).count() >= stopDelaySec)
+            stopRecording();
+
+        if (recording)
+            writer.write(processed); // 录画框后的帧，回放时能看到检测结果
+
         emit frameReady(matToQImage(processed));
         msleep(frameDelay);
     }
 
+    // 线程退出前必须关闭录像文件
+    stopRecording();
     cap.release();
-    emit finished(); // 通知 UI 复位按钮状态
+    emit finished();
 }

@@ -20,6 +20,7 @@ private slots:
     void onStop();
     void onFrame(const QImage &image);
     void onMotion(bool detected);
+    void onRecording(bool recording);
 
 private:
     QLabel *videoLabel;

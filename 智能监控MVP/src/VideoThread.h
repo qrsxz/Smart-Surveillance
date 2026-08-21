@@ -23,6 +23,7 @@ public:
 signals:
     void frameReady(const QImage &image);
     void motionState(bool detected);
+    void finished();                            // 视频源正常结束（文件播完/摄像头断开）
     void finishedWithError(const QString &msg);
 
 protected:
@@ -32,6 +33,10 @@ private:
     QString source;
     std::atomic<bool> running{false};
     MotionDetector detector;
+
+    // 运动防抖计数（连续帧），避免状态栏狂闪
+    int motionStreak = 0;
+    int noMotionStreak = 0;
 };
 
 #endif

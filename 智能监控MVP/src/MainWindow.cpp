@@ -43,6 +43,12 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
         startBtn->setEnabled(true);
         stopBtn->setEnabled(false);
     });
+    // 视频源正常结束（文件播完/摄像头断开）时复位按钮，避免界面卡死在"运行中"
+    connect(thread, &VideoThread::finished, this, [this]() {
+        startBtn->setEnabled(true);
+        stopBtn->setEnabled(false);
+        statusLabel->setText("状态：已停止（视频源结束）");
+    });
 
     connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStart);
     connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStop);

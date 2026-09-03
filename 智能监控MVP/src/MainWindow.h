@@ -1,4 +1,4 @@
-#ifndef MAINWINDOW_H
+﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QWidget>
@@ -9,14 +9,16 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QGridLayout;
+class QCheckBox;
 class VideoThread;
 
-// v3: 一路视频源对应一个格子（线程 + 画面 + 标题）
+// v4: 一路视频源对应一个格子（线程 + 画面 + 标题 + 计数）
 struct CameraCell
 {
     VideoThread *thread = nullptr;
     QLabel *videoLabel = nullptr;
     QLabel *nameLabel = nullptr;
+    QLabel *countLabel = nullptr;  // v4: 人物计数标签
 };
 
 class MainWindow : public QWidget
@@ -29,6 +31,7 @@ public:
 private slots:
     void onAddCamera();
     void onStopAll();
+    void onToggleCounting(bool checked);
 
 private:
     void addCell(const QString &source);
@@ -36,6 +39,7 @@ private:
     QLineEdit *sourceEdit;
     QPushButton *addBtn;
     QPushButton *stopAllBtn;
+    QCheckBox *countingCheckBox;  // v4: 计数功能开关
     QLabel *infoLabel;
     QGridLayout *gridLayout;
 

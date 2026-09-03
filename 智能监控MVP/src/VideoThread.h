@@ -1,4 +1,4 @@
-#ifndef VIDEOTHREAD_H
+﻿#ifndef VIDEOTHREAD_H
 #define VIDEOTHREAD_H
 
 #include <QThread>
@@ -9,10 +9,10 @@
 
 #include <opencv2/videoio.hpp>
 
-#include "MotionDetector.h"
+#include "PersonDetector.h"
 
-// 采集线程：读帧 -> 运动检测 -> (运动时自动录像) -> 发信号给 UI，不阻塞界面
-// v3: 一个线程处理一路视频源，可被 MainWindow 实例化多个形成九宫格
+// 采集线程：读帧 -> 人物检测 -> (运动时自动录像) -> 发信号给 UI，不阻塞界面
+// v4: 一个线程处理一路视频源，可被 MainWindow 实例化多个形成九宫格
 class VideoThread : public QThread
 {
     Q_OBJECT
@@ -25,9 +25,13 @@ public:
     void setSource(const QString &source, int id);
     void stop();
 
+    // 设置是否启用计数功能
+    void setCountingEnabled(bool enabled);
+
 signals:
     void frameReady(const QImage &image);
     void motionState(bool detected);
+    void personCountChanged(int count);         // v4: 人物数量变化
     void recordingState(bool recording);        // v2: 录像状态变化
     void finished();                            // 视频源正常结束（文件播完/摄像头断开）
     void finishedWithError(const QString &msg);
@@ -42,7 +46,7 @@ private:
     QString source;
     int cameraId = 0;                           // v3: 路号，用于录像文件命名
     std::atomic<bool> running{false};
-    MotionDetector detector;
+    PersonDetector detector;                    // v4: 使用人物检测器
 
     // 运动防抖计数（连续帧），避免状态栏狂闪
     int motionStreak = 0;

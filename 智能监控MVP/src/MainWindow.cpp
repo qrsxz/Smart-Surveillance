@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include "VideoThread.h"
 
 #include <QHBoxLayout>
@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QCheckBox>
 #include <QPixmap>
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
@@ -18,6 +19,8 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
 
     addBtn = new QPushButton("添加并启动");
     stopAllBtn = new QPushButton("全部停止");
+    countingCheckBox = new QCheckBox("显示人物计数");
+    countingCheckBox->setChecked(true);  // 默认开启
     infoLabel = new QLabel("已添加 0/9 路");
     infoLabel->setStyleSheet("color:#888;");
 
@@ -25,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
     top->addWidget(sourceEdit, 1);
     top->addWidget(addBtn);
     top->addWidget(stopAllBtn);
+    top->addWidget(countingCheckBox);
     top->addWidget(infoLabel);
 
     // ---- 九宫格 ----
@@ -48,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
 
     connect(addBtn, &QPushButton::clicked, this, &MainWindow::onAddCamera);
     connect(stopAllBtn, &QPushButton::clicked, this, &MainWindow::onStopAll);
+    connect(countingCheckBox, &QCheckBox::toggled, this, &MainWindow::onToggleCounting);
 }
 
 MainWindow::~MainWindow()
@@ -55,7 +60,22 @@ MainWindow::~MainWindow()
     onStopAll();
 }
 
-// v3: 添加一路视频源：创建线程 + 格子，启动线程
+// v4: 切换所有视频路的计数功能
+void MainWindow::onToggleCounting(bool checked)
+{
+    for (auto &c : cells)
+    {
+        if (c.thread)
+        {
+            c.thread->setCountingEnabled(checked);
+            // 同时隐藏/显示UI上的计数标签
+            if (c.countLabel)
+                c.countLabel->setVisible(checked);
+        }
+    }
+}
+
+// v4: 添加一路视频源：创建线程 + 格子，启动线程
 void MainWindow::addCell(const QString &source)
 {
     if (cells.size() >= MAX_CELLS)
@@ -67,6 +87,7 @@ void MainWindow::addCell(const QString &source)
     int cellIndex = cells.size();
     auto *thread = new VideoThread(this);
     thread->setSource(source, cameraIdCounter++);
+    thread->setCountingEnabled(countingCheckBox->isChecked());
 
     auto *nameLabel = new QLabel("加载中…");
     nameLabel->setStyleSheet("color:#aaa; padding:2px; background:#111;");
@@ -77,11 +98,17 @@ void MainWindow::addCell(const QString &source)
     videoLabel->setMinimumSize(200, 120);
     videoLabel->setStyleSheet("background:#000; color:#666;");
 
+    auto *countLabel = new QLabel("人物: 0");
+    countLabel->setStyleSheet("color:#0f0; padding:2px; background:#111; font-weight:bold;");
+    countLabel->setAlignment(Qt::AlignCenter);
+    countLabel->setVisible(countingCheckBox->isChecked());  // 初始状态跟随checkbox
+
     auto *box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(0);
     box->addWidget(nameLabel);
     box->addWidget(videoLabel, 1);
+    box->addWidget(countLabel);
 
     auto *container = new QWidget;
     container->setLayout(box);
@@ -105,7 +132,11 @@ void MainWindow::addCell(const QString &source)
             });
     connect(thread, &VideoThread::motionState, this,
             [nameLabel](bool detected) {
-                nameLabel->setText(detected ? "● 运动" : "○ 正常");
+                nameLabel->setText(detected ? "● 检测到人物" : "○ 无人");
+            });
+    connect(thread, &VideoThread::personCountChanged, this,
+            [countLabel](int count) {
+                countLabel->setText(QString("人物: %1").arg(count));
             });
     connect(thread, &VideoThread::recordingState, this,
             [nameLabel](bool rec) {
@@ -120,7 +151,7 @@ void MainWindow::addCell(const QString &source)
                 nameLabel->setText("已结束");
             });
 
-    cells.append(CameraCell{thread, videoLabel, nameLabel});
+    cells.append(CameraCell{thread, videoLabel, nameLabel, countLabel});
     infoLabel->setText(QString("已添加 %1/9 路").arg(cells.size()));
 
     thread->start();
@@ -137,7 +168,7 @@ void MainWindow::onAddCamera()
     addCell(src);
 }
 
-// v3: 停止并清理所有路
+// v4: 停止并清理所有路
 void MainWindow::onStopAll()
 {
     for (auto &c : cells)

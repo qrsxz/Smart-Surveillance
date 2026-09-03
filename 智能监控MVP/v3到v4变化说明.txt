@@ -1,0 +1,139 @@
+﻿========================================
+智能监控 MVP v3 到 v4 变化说明
+========================================
+
+一、核心变化概述
+----------------------------------------
+v3版本：运动物体检测（任何移动的物体都会触发）
+v4版本：运动人物识别（只识别人形目标，过滤其他运动物体）
+
+二、技术实现变化
+----------------------------------------
+
+1. 检测算法变更
+   ----------------------------------------
+   v3: BackgroundSubtractorMOG2（背景减除法）
+       - 原理：建立背景模型，检测前景变化
+       - 缺点：任何运动物体（树叶、光影、动物）都会触发
+       
+   v4: HOG + SVM 行人检测器
+       - 原理：Histogram of Oriented Gradients + 支持向量机
+       - 优点：专门针对人形目标训练，只识别人物
+       - 实现：cv::HOGDescriptor::getDefaultPeopleDetector()
+
+2. 新增文件
+   ----------------------------------------
+   - src/PersonDetector.h    （人物检测器头文件）
+   - src/PersonDetector.cpp  （人物检测器实现）
+   
+   删除文件：
+   - src/MotionDetector.h    （原运动检测器头文件）
+   - src/MotionDetector.cpp  （原运动检测器实现）
+
+3. 检测流程对比
+   ----------------------------------------
+   v3流程：
+   视频帧 -> MOG2背景减除 -> 形态学去噪 -> 轮廓检测 -> 画框
+   
+   v4流程：
+   视频帧 -> HOG多尺度检测 -> NMS去重 -> 画框 + 置信度 -> 计数显示
+
+三、新增功能
+----------------------------------------
+
+1. 人物计数功能
+   - 实时统计画面中检测到的人物数量
+   - 画面上方显示红色 "Person Count: X"
+   - UI下方显示绿色 "人物: X" 标签
+
+2. 计数开关功能
+   - 界面顶部新增"显示人物计数"复选框
+   - 勾选：显示计数文字和标签
+   - 取消：隐藏计数文字和标签
+   - 支持运行时动态切换
+
+3. 置信度显示
+   - 每个检测框上方显示 "Person: 0.XX"
+   - 置信度范围：0-1，越高越确定
+
+四、代码修改详情
+----------------------------------------
+
+1. MainWindow.h 修改
+   - CameraCell结构体新增 countLabel 成员
+   - 新增 countingCheckBox 成员
+   - 新增 onToggleCounting 槽函数
+
+2. MainWindow.cpp 修改
+   - 构造函数：添加checkbox和countLabel
+   - addCell：初始化countLabel，连接personCountChanged信号
+   - onToggleCounting：切换所有视频路的计数显示状态
+   - motionState信号：改为"检测到人物"/"无人"
+
+3. VideoThread.h 修改
+   - #include "MotionDetector.h" 改为 #include "PersonDetector.h"
+   - 成员变量 detector 类型从 MotionDetector 改为 PersonDetector
+   - 新增 personCountChanged(int count) 信号
+   - 新增 setCountingEnabled(bool enabled) 方法
+
+4. VideoThread.cpp 修改
+   - setCountingEnabled：调用detector.setCountingEnabled
+   - run函数：使用detector.hasPerson()替代hasMotion()
+   - run函数：发送personCountChanged信号
+
+5. CMakeLists.txt 修改
+   - 源文件列表：MotionDetector.cpp 改为 PersonDetector.cpp
+
+五、使用的关键OpenCV函数
+----------------------------------------
+
+1. cv::HOGDescriptor::getDefaultPeopleDetector()
+   - 获取预训练的HOG+SVM行人检测模型
+   - 模型基于INRIA行人数据集训练
+
+2. cv::HOGDescriptor::detectMultiScale()
+   - 多尺度滑动窗口检测
+   - 参数：
+     - winStride: 滑动步长 (8,8)
+     - padding: 边缘填充 (0,0)
+     - scale: 缩放因子 1.05
+     - groupThreshold: 分组阈值 2
+
+3. cv::dnn::NMSBoxes()
+   - 非极大值抑制，去除重叠的检测框
+   - 参数：
+     - scoreThreshold: 分数阈值 0.5
+     - nmsThreshold: NMS阈值 0.4
+
+六、编译指令
+----------------------------------------
+
+# 进入虚拟机
+ssh suge@192.168.136.129
+
+# 进入项目目录
+cd ~/智能监控MVP/build
+
+# 清理并重新编译
+rm -rf *
+cmake ..
+make -j4
+
+# 运行程序
+./SmartSurveillanceMVP
+
+七、测试建议
+----------------------------------------
+1. 使用包含人物的视频测试识别准确度
+2. 使用无人物但有运动物体的视频验证过滤效果
+3. 测试计数开关的切换是否正常
+4. 测试多路视频同时运行的稳定性
+
+八、已知限制
+----------------------------------------
+1. HOG检测器对侧面/背面人物识别率较低
+2. 远距离小目标人物可能漏检
+3. 遮挡严重时识别效果下降
+4. 实时性受CPU性能影响，高分辨率可能卡顿
+
+========================================

@@ -1,4 +1,4 @@
-#include "VideoThread.h"
+﻿#include "VideoThread.h"
 
 #include <opencv2/opencv.hpp>
 #include <QDir>
@@ -21,6 +21,11 @@ void VideoThread::setSource(const QString &s, int id)
 void VideoThread::stop()
 {
     running = false;
+}
+
+void VideoThread::setCountingEnabled(bool enabled)
+{
+    detector.setCountingEnabled(enabled);
 }
 
 // v2: 打开录像文件，开始录制（v3: 文件名带路号，避免多路同时录制互相覆盖）
@@ -91,6 +96,7 @@ void VideoThread::run()
     running = true;
     cv::Mat frame;
     bool lastMotion = false;
+    int lastPersonCount = 0;
 
     while (running)
     {
@@ -108,10 +114,12 @@ void VideoThread::run()
             continue;
         }
 
+        // v4: 使用人物检测器处理帧
         cv::Mat processed = detector.process(frame);
+        bool motion = detector.hasPerson();
+        int personCount = detector.getPersonCount();
 
         // 运动防抖：连续 3 帧有运动才判定，连续 3 帧无运动才解除，状态变化时才发信号
-        bool motion = detector.hasMotion();
         motionStreak = motion ? motionStreak + 1 : 0;
         noMotionStreak = motion ? 0 : noMotionStreak + 1;
 
@@ -125,6 +133,13 @@ void VideoThread::run()
         {
             lastMotion = stableMotion;
             emit motionState(stableMotion);
+        }
+
+        // v4: 人物数量变化信号
+        if (personCount != lastPersonCount)
+        {
+            lastPersonCount = personCount;
+            emit personCountChanged(personCount);
         }
 
         // ===== v2: 运动自动录像 =====

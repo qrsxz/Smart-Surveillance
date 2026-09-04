@@ -11,6 +11,7 @@ class QPushButton;
 class QGridLayout;
 class QCheckBox;
 class VideoThread;
+class StreamServer;
 
 // v4: 一路视频源对应一个格子（线程 + 画面 + 标题 + 计数）
 struct CameraCell
@@ -35,6 +36,8 @@ private slots:
 
 private:
     void addCell(const QString &source);
+    void startStreamServer();       // v5: 启动局域网流媒体服务
+    QString localIpAddress() const; // v5: 获取本机局域网IP
 
     QLineEdit *sourceEdit;
     QPushButton *addBtn;
@@ -42,6 +45,8 @@ private:
     QCheckBox *countingCheckBox;  // v4: 计数功能开关
     QLabel *infoLabel;
     QGridLayout *gridLayout;
+
+    StreamServer *streamServer = nullptr;  // v5: 局域网推流
 
     QVector<CameraCell> cells;      // 已添加的视频路
     int cameraIdCounter = 1;        // 路号递增，用于录像文件命名

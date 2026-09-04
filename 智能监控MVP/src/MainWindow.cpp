@@ -1,5 +1,6 @@
-﻿#include "MainWindow.h"
+#include "MainWindow.h"
 #include "VideoThread.h"
+#include "StreamServer.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -9,6 +10,8 @@
 #include <QPushButton>
 #include <QCheckBox>
 #include <QPixmap>
+#include <QNetworkInterface>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
 {
@@ -53,11 +56,45 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
     connect(addBtn, &QPushButton::clicked, this, &MainWindow::onAddCamera);
     connect(stopAllBtn, &QPushButton::clicked, this, &MainWindow::onStopAll);
     connect(countingCheckBox, &QCheckBox::toggled, this, &MainWindow::onToggleCounting);
+
+    // v5: 启动局域网流媒体服务
+    startStreamServer();
 }
 
 MainWindow::~MainWindow()
 {
     onStopAll();
+}
+
+// v5: 启动局域网流媒体服务，浏览器访问 http://IP:8081 看实时画面
+void MainWindow::startStreamServer()
+{
+    streamServer = new StreamServer(this);
+    if (streamServer->startServer(8081))
+    {
+        QString ip = localIpAddress();
+        qInfo() << "局域网监控地址: http://" << ip << ":8081";
+        infoLabel->setText(QString("已添加 0/9 路 | 局域网: http://%1:8081").arg(ip));
+    }
+    else
+    {
+        qWarning() << "流媒体服务器启动失败: 端口 8081 可能被占用";
+    }
+}
+
+// v5: 获取本机第一个可用的局域网 IPv4 地址
+QString MainWindow::localIpAddress() const
+{
+    const QList<QHostAddress> addrs = QNetworkInterface::allAddresses();
+    for (const QHostAddress &addr : addrs)
+    {
+        if (addr.protocol() == QAbstractSocket::IPv4Protocol &&
+            !addr.isLoopback() && addr != QHostAddress::LocalHost)
+        {
+            return addr.toString();
+        }
+    }
+    return "127.0.0.1";
 }
 
 // v4: 切换所有视频路的计数功能
@@ -124,11 +161,14 @@ void MainWindow::addCell(const QString &source)
 
     // 线程信号 -> 主线程更新对应格子（跨线程队列连接，安全）
     connect(thread, &VideoThread::frameReady, this,
-            [videoLabel](const QImage &img) {
+            [this, videoLabel](const QImage &img) {
                 videoLabel->setPixmap(QPixmap::fromImage(img)
                                           .scaled(videoLabel->size(),
                                                   Qt::KeepAspectRatio,
                                                   Qt::SmoothTransformation));
+                // v5: 同步推流到局域网（内部无客户端时会自动跳过）
+                if (streamServer)
+                    streamServer->broadcastFrame(img);
             });
     connect(thread, &VideoThread::motionState, this,
             [nameLabel](bool detected) {
@@ -152,7 +192,9 @@ void MainWindow::addCell(const QString &source)
             });
 
     cells.append(CameraCell{thread, videoLabel, nameLabel, countLabel});
-    infoLabel->setText(QString("已添加 %1/9 路").arg(cells.size()));
+    infoLabel->setText(QString("已添加 %1/9 路 | 局域网: http://%2:8081")
+                           .arg(cells.size())
+                           .arg(localIpAddress()));
 
     thread->start();
 }
@@ -199,5 +241,5 @@ void MainWindow::onStopAll()
         gridLayout->addWidget(empty, i / 3, i % 3);
     }
 
-    infoLabel->setText("已添加 0/9 路");
+    infoLabel->setText("已添加 0/9 路 | 局域网: http://" + localIpAddress() + ":8081");
 }
